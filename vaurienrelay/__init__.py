@@ -8,7 +8,7 @@ import zerorpc
 class RPCRelay(object):
 
     # these are the methods generated on the fly
-    methods = ('set_handler, get_handler', 'list_handler')
+    methods = ('get_handler', 'list_handler')
 
     def __init__(self, zmq_socket, vaurien_instances):
         """Proxy the calls made here to vaurien clients.
@@ -37,6 +37,7 @@ class RPCRelay(object):
         self._zmq_socket = zmq_socket
         self._vaurien_instances = vaurien_instances
         self._clients = {}
+        self._in_use = []
 
         for method in self.methods:
             # dynamically create the list of methods.
@@ -52,6 +53,36 @@ class RPCRelay(object):
             host, port = parts.netloc.split(':', -1)
             self._clients[name] = VaurienClient(host, port)
         return self._clients[name]
+
+    def set_handler(self, instance, handler, release_lock=False):
+        """Set the handler on the given client.
+
+        An instance can only be set once at a time. A lock is present to avoid
+        asking a client to do different things at the same time.
+
+        :param instance:
+            The name of the instance to send the command to.
+
+        :param handler:
+            The name of the handler to change.
+
+        :param release_lock:
+            Explicitely release the lock (default False). This needs to be
+            called otherwise it will not be possible to change the handler for
+            this instance.
+        """
+        resp = None
+
+        if instance not in self._in_use or release_lock:
+            resp = self._get_client(instance).set_handler(handler)
+
+        if instance in self._in_use and release_lock:
+            self._in_use.pop(instance)
+
+        if resp:
+            return resp
+        else:
+            ValueError('There is a lock on this client')
 
     def relay_method(self, method, instance, *args, **kwargs):
         """Relay the :param method: method to the right vaurien proxy,
