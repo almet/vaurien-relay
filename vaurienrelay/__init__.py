@@ -8,7 +8,7 @@ import zerorpc
 class RPCRelay(object):
 
     # these are the methods generated on the fly
-    methods = ('get_handler', 'list_handler')
+    methods = ('get_handler', 'list_handlers')
 
     def __init__(self, zmq_socket, vaurien_instances):
         """Proxy the calls made here to vaurien clients.
@@ -42,7 +42,7 @@ class RPCRelay(object):
         for method in self.methods:
             # dynamically create the list of methods.
             setattr(self, method,
-                    functools.partial(self.relay_method, self, method))
+                    functools.partial(self.relay_method, method))
 
     def _get_client(self, name):
         """Return a vaurien client, or raise a ValueError if "name"
@@ -75,6 +75,8 @@ class RPCRelay(object):
 
         if instance not in self._in_use or release_lock:
             resp = self._get_client(instance).set_handler(handler)
+            if not release_lock:
+                self._in_use.append(instance)
 
         if instance in self._in_use and release_lock:
             self._in_use.pop(instance)
