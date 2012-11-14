@@ -27,11 +27,12 @@ class RelayTest(TestCase):
         self.relay = RPCRelay(None, self.instances)
 
         # wait for the servers to start
-        time.sleep(0.5)
+        time.sleep(0.2)
 
     def tearDown(self):
         for process in self.processes:
             process.terminate()
+            process.wait()
 
     def test_wrong_routing(self):
         # proxy3 doesn't exist, so this should fail
@@ -54,7 +55,13 @@ class RelayTest(TestCase):
 
     def test_lock_release(self):
         # if we explicitely release the lock, everything should be back to
-        # normal
+        # normal at the end.
         self.relay.set_handler('proxy1', 'blackout')
         self.relay.set_handler('proxy1', 'normal', release_lock=True)
+        self.assertEquals('normal', self.relay.get_handler('proxy1'))
+
+    def test_lock_timeout(self):
+        self.relay.set_handler('proxy1', 'blackout', timeout=0.1)
+        time.sleep(0.2)
+        self.relay.set_handler('proxy1', 'normal')
         self.assertEquals('normal', self.relay.get_handler('proxy1'))
